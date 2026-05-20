@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { width: 400px; padding: 20px; font-family: monospace; background: #0A0C14; color: #fff; }
+    textarea { width: 100%; padding: 10px; margin: 10px 0; background: #1a1f2e; border: 1px solid #2a3a52; color: #fff; border-radius: 8px; font-family: monospace; }
+    button { background: #00e5a0; color: #000; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; }
+    button:hover { background: #00cc8c; }
+    #response { margin-top: 15px; padding: 10px; background: #1a1f2e; border-radius: 8px; max-height: 300px; overflow-y: auto; font-size: 12px; white-space: pre-wrap; }
+    .status { font-size: 11px; color: #6b85a0; margin-top: 5px; }
+    hr { border-color: #2a3a52; margin: 15px 0; }
+  </style>
+</head>
+<body>
+  <h3>🤖 Qwen API Controller</h3>
+  <textarea id="message" rows="3" placeholder="Enter your question..."></textarea>
+  <button id="send">Send to Qwen</button>
+  <div id="response"></div>
+  <div class="status" id="status">Ready</div>
+  <hr>
+  <div style="font-size: 11px; color: #6b85a0;">
+    💡 External apps can send to:<br>
+    <code style="background:#1a1f2e; padding:2px 4px;">chrome.runtime.sendMessage(extensionId, {action:"ask", message:"Hi"})</code>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

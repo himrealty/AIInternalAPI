@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "DeepSeek API Controller",
+  "version": "1.1",
+  "description": "Send commands to DeepSeek from outside",
+  "permissions": ["activeTab", "scripting", "storage", "tabs"],
+  "host_permissions": ["https://chat.deepseek.com/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://chat.deepseek.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "externally_connectable": {
+    "ids": ["*"],
+    "matches": ["*://*.deepseek.com/*"]
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "DeepSeek API"
+  }
+}
