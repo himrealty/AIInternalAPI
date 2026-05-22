@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Relay Server</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0c14; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; min-height: 100vh; padding: 24px; }
+    h1 { color: #fff; font-size: 20px; margin-bottom: 4px; }
+    .subtitle { color: #64748b; font-size: 12px; margin-bottom: 24px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 900px; }
+    @media(max-width:600px){ .grid { grid-template-columns: 1fr; } }
+    .card { background: #111827; border: 1px solid #1f2937; border-radius: 10px; padding: 16px; }
+    .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 12px; }
+    .stat { font-size: 32px; font-weight: 700; color: #00e5a0; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .badge.green { background: #052e16; color: #00e5a0; border: 1px solid #00e5a0; }
+    .badge.red   { background: #1f0a0a; color: #ef4444; border: 1px solid #ef4444; }
+    .endpoint { background: #0f172a; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; font-family: monospace; font-size: 12px; }
+    .method { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-right: 8px; }
+    .method.post { background: #1e3a5f; color: #60a5fa; }
+    .method.get  { background: #1a3a1f; color: #4ade80; }
+    .path { color: #e2e8f0; }
+    .desc { color: #64748b; font-size: 11px; margin-top: 3px; }
+    input, select { width: 100%; padding: 8px 10px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #fff; font-size: 12px; margin-bottom: 8px; outline: none; font-family: inherit; }
+    input:focus, select:focus { border-color: #00e5a0; }
+    button { padding: 8px 16px; background: #00e5a0; color: #000; border: none; border-radius: 6px; font-weight: 600; font-size: 12px; cursor: pointer; width: 100%; }
+    button:hover { background: #00cc8c; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .response { background: #0f172a; border: 1px solid #1f2937; border-radius: 6px; padding: 10px; font-family: monospace; font-size: 11px; white-space: pre-wrap; min-height: 60px; max-height: 200px; overflow-y: auto; margin-top: 8px; color: #94a3b8; }
+    .full { grid-column: 1 / -1; }
+    .code { color: #00e5a0; }
+  </style>
+</head>
+<body>
+  <h1>🤖 AI Relay Server</h1>
+  <p class="subtitle">WebSocket bridge between HTTP clients and the Chrome extension</p>
+
+  <div class="grid">
+
+    <div class="card">
+      <h2>Server Status</h2>
+      <div style="display:flex; gap:24px; align-items:center; flex-wrap:wrap;">
+        <div>
+          <div style="color:#64748b; font-size:11px; margin-bottom:4px;">Extension</div>
+          <span id="extStatus" class="badge red">Disconnected</span>
+        </div>
+        <div>
+          <div style="color:#64748b; font-size:11px; margin-bottom:4px;">Pending Jobs</div>
+          <div id="pendingJobs" class="stat">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Quick Test</h2>
+      <select id="provider">
+        <option value="claude">Claude</option>
+        <option value="deepseek">DeepSeek</option>
+        <option value="qwen">Qwen</option>
+        <option value="gemini">Gemini</option>
+      </select>
+      <input type="text" id="apiKey" placeholder="API Key (leave blank if none)">
+      <input type="text" id="message" placeholder="Enter your prompt...">
+      <button id="sendBtn" onclick="sendPrompt()">▶ Send</button>
+      <div id="response" class="response">Response will appear here...</div>
+    </div>
+
+    <div class="card full">
+      <h2>API Endpoints</h2>
+      <div class="endpoint">
+        <span class="method post">POST</span><span class="path">/prompt/:provider</span>
+        <div class="desc">Body: {"message": "..."} — Send prompt to any provider</div>
+      </div>
+      <div class="endpoint">
+        <span class="method get">GET</span><span class="path">/prompt/:provider?message=...</span>
+        <div class="desc">Same as above, GET version for easy testing</div>
+      </div>
+      <div class="endpoint">
+        <span class="method post">POST</span><span class="path">/run</span>
+        <div class="desc">Body: {"provider":"...","action":"...","message":"..."} — Full control</div>
+      </div>
+      <div class="endpoint">
+        <span class="method get">GET</span><span class="path">/status</span>
+        <div class="desc">Server health + extension connection state</div>
+      </div>
+    </div>
+
+    <div class="card full">
+      <h2>curl Examples</h2>
+      <div class="endpoint">
+        <div style="color:#64748b;font-size:10px;margin-bottom:6px;">POST prompt</div>
+        <span class="code">curl</span> -X POST <span id="origin1"></span>/prompt/claude \<br>
+        &nbsp;&nbsp;-H "x-api-key: YOUR_KEY" \<br>
+        &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
+        &nbsp;&nbsp;-d '{"message": "What is 2+2?"}'
+      </div>
+      <div class="endpoint" style="margin-top:8px;">
+        <div style="color:#64748b;font-size:10px;margin-bottom:6px;">GET prompt</div>
+        <span class="code">curl</span> "<span id="origin2"></span>/prompt/deepseek?message=hello&api_key=YOUR_KEY"
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const BASE = window.location.origin;
+    document.getElementById('origin1').textContent = BASE;
+    document.getElementById('origin2').textContent = BASE;
+
+    async function poll() {
+      try {
+        const data = await fetch(`${BASE}/status`).then(r => r.json());
+        const el = document.getElementById('extStatus');
+        el.textContent = data.extensionConnected ? 'Connected' : 'Disconnected';
+        el.className = 'badge ' + (data.extensionConnected ? 'green' : 'red');
+        document.getElementById('pendingJobs').textContent = data.pendingJobs ?? 0;
+      } catch(_) {}
+    }
+
+    async function sendPrompt() {
+      const provider = document.getElementById('provider').value;
+      const message  = document.getElementById('message').value.trim();
+      const apiKey   = document.getElementById('apiKey').value.trim();
+      const respEl   = document.getElementById('response');
+      const btn      = document.getElementById('sendBtn');
+      if (!message) { respEl.textContent = '❌ Enter a message first'; return; }
+      btn.disabled = true;
+      respEl.textContent = '⏳ Waiting for extension...';
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (apiKey) headers['x-api-key'] = apiKey;
+        const res  = await fetch(`${BASE}/prompt/${provider}`, { method: 'POST', headers, body: JSON.stringify({ message }) });
+        const data = await res.json();
+        respEl.textContent = data.result || data.error || JSON.stringify(data, null, 2);
+      } catch(e) {
+        respEl.textContent = '❌ ' + e.message;
+      }
+      btn.disabled = false;
+    }
+
+    document.getElementById('message').addEventListener('keydown', e => { if (e.key === 'Enter') sendPrompt(); });
+
+    poll();
+    setInterval(poll, 3000);
+  </script>
+</body>
+</html>
