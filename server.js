@@ -4,6 +4,8 @@ const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
 
+const path = require('path');
+
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
@@ -14,6 +16,7 @@ const SELF_PING_URL = process.env.RENDER_EXTERNAL_URL || process.env.SELF_PING_U
 const PING_INTERVAL = Number(process.env.PING_INTERVAL) || 5 * 60 * 1000;
 
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   next();
