@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GBP Review Manager</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0c14; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; min-height: 100vh; padding: 24px; }
+
+    h1 { color: #fff; font-size: 20px; margin-bottom: 4px; }
+    .subtitle { color: #64748b; font-size: 12px; margin-bottom: 24px; }
+
+    .card { background: #111827; border: 1px solid #1f2937; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+    .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 12px; }
+
+    /* Status bar */
+    .status-bar { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .badge.green { background: #052e16; color: #00e5a0; border: 1px solid #00e5a0; }
+    .badge.red   { background: #1f0a0a; color: #ef4444; border: 1px solid #ef4444; }
+
+    /* Buttons */
+    button { padding: 8px 16px; border: none; border-radius: 6px; font-weight: 600; font-size: 12px; cursor: pointer; transition: background 0.15s; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary  { background: #00e5a0; color: #000; }
+    .btn-primary:hover:not(:disabled)  { background: #00cc8c; }
+    .btn-danger   { background: #ef4444; color: #fff; }
+    .btn-danger:hover:not(:disabled)   { background: #dc2626; }
+    .btn-warn     { background: #f59e0b; color: #000; }
+    .btn-warn:hover:not(:disabled)     { background: #d97706; }
+    .btn-ghost    { background: #1f2937; color: #94a3b8; border: 1px solid #334155; }
+    .btn-ghost:hover:not(:disabled)    { background: #374151; }
+    .btn-ai       { background: #7c3aed; color: #fff; }
+    .btn-ai:hover:not(:disabled)       { background: #6d28d9; }
+    .btn-sm { padding: 5px 10px; font-size: 11px; }
+
+    /* Table */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { background: #0f172a; color: #64748b; text-align: left; padding: 10px 12px; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; border-bottom: 1px solid #1f2937; white-space: nowrap; }
+    td { padding: 10px 12px; border-bottom: 1px solid #1f2937; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #0f172a; }
+
+    .stars { color: #f59e0b; letter-spacing: 1px; }
+    .replied-yes { color: #00e5a0; font-weight: 600; }
+    .replied-no  { color: #ef4444; font-weight: 600; }
+
+    .comment-cell { max-width: 220px; word-break: break-word; color: #cbd5e1; }
+    .reply-cell   { max-width: 200px; word-break: break-word; color: #94a3b8; font-style: italic; }
+
+    .actions-cell { display: flex; gap: 6px; flex-wrap: wrap; min-width: 180px; }
+
+    /* Business selector */
+    select { padding: 8px 10px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #fff; font-size: 12px; outline: none; }
+    select:focus { border-color: #00e5a0; }
+
+    /* Reply modal */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 24px; width: 100%; max-width: 480px; }
+    .modal h3 { color: #fff; font-size: 16px; margin-bottom: 6px; }
+    .modal .reviewer { color: #64748b; font-size: 12px; margin-bottom: 16px; }
+    .modal .review-quote { background: #0f172a; border-left: 3px solid #334155; padding: 10px 12px; border-radius: 4px; font-size: 12px; color: #94a3b8; margin-bottom: 16px; font-style: italic; max-height: 80px; overflow-y: auto; }
+    textarea.reply-input { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #fff; font-size: 12px; padding: 10px; resize: vertical; min-height: 100px; outline: none; font-family: inherit; }
+    textarea.reply-input:focus { border-color: #00e5a0; }
+    .modal-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
+    .ai-status { font-size: 11px; color: #7c3aed; margin-top: 6px; min-height: 16px; }
+
+    /* Toast */
+    .toast { position: fixed; bottom: 24px; right: 24px; background: #111827; border: 1px solid #1f2937; border-radius: 8px; padding: 12px 16px; font-size: 12px; z-index: 200; display: none; }
+    .toast.show { display: block; }
+    .toast.ok    { border-color: #00e5a0; color: #00e5a0; }
+    .toast.error { border-color: #ef4444; color: #ef4444; }
+
+    .loader { display: inline-block; width: 12px; height: 12px; border: 2px solid #334155; border-top-color: #00e5a0; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty { text-align: center; padding: 40px; color: #334155; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+  <h1>📍 GBP Review Manager</h1>
+  <p class="subtitle">Manage Google Business Profile reviews via the Chrome extension relay</p>
+
+  <!-- Status -->
+  <div class="status-bar">
+    <div>Extension: <span id="extStatus" class="badge red">Disconnected</span></div>
+    <div style="margin-left:auto; display:flex; gap:8px;">
+      <button class="btn-ghost" onclick="loadBusinesses()">🏢 Load Businesses</button>
+      <a href="/" style="text-decoration:none;"><button class="btn-ghost">← Back</button></a>
+    </div>
+  </div>
+
+  <!-- Business selector -->
+  <div class="card" id="businessCard" style="display:none;">
+    <h2>Select Business</h2>
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <select id="businessSelect" onchange="onBusinessChange()">
+        <option value="">— Select a business —</option>
+      </select>
+      <button class="btn-primary" onclick="loadReviews()">Load Reviews</button>
+      <button class="btn-warn" onclick="autoReplyAll()" id="autoReplyBtn">⚡ AI Reply All Unreplied</button>
+    </div>
+  </div>
+
+  <!-- Reviews table -->
+  <div class="card" id="reviewsCard" style="display:none;">
+    <h2 id="reviewsTitle">Reviews</h2>
+    <div class="table-wrap">
+      <table id="reviewsTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Reviewer</th>
+            <th>Stars</th>
+            <th>Comment</th>
+            <th>Replied</th>
+            <th>Current Reply</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="reviewsBody">
+          <tr><td colspan="7" class="empty">No reviews loaded</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Reply Modal -->
+  <div class="modal-overlay" id="replyModal">
+    <div class="modal">
+      <h3 id="modalTitle">Reply to Review</h3>
+      <div class="reviewer" id="modalReviewer"></div>
+      <div class="review-quote" id="modalQuote"></div>
+      <textarea class="reply-input" id="replyText" placeholder="Write your reply..." maxlength="4000"></textarea>
+      <div class="ai-status" id="aiStatus"></div>
+      <div class="modal-actions">
+        <button class="btn-ai btn-sm" onclick="aiSuggest()">✨ AI Suggest</button>
+        <button class="btn-ghost btn-sm" onclick="closeModal()">Cancel</button>
+        <button class="btn-primary btn-sm" id="submitReplyBtn" onclick="submitReply()">Submit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+<script>
+  const BASE = window.location.origin;
+  const API_KEY = '';  // Set your API key here if needed
+
+  let businesses = [];
+  let reviews = [];
+  let currentBusinessIndex = 0;
+  let modalMode = '';   // 'reply' or 'edit'
+  let modalReviewIndex = 0;
+
+  // ── Helpers ──────────────────────────────────────────────
+
+  function headers() {
+    const h = { 'Content-Type': 'application/json' };
+    if (API_KEY) h['x-api-key'] = API_KEY;
+    return h;
+  }
+
+  function toast(msg, type = 'ok') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = `toast show ${type}`;
+    setTimeout(() => el.className = 'toast', 3000);
+  }
+
+  function starsHtml(label) {
+    const match = label.match(/(\d)/);
+    const n = match ? parseInt(match[1]) : 0;
+    return '★'.repeat(n) + '☆'.repeat(5 - n);
+  }
+
+  async function dispatch(provider, actionType, params = {}) {
+    const res = await fetch(`${BASE}/run`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ provider, action: actionType, ...params })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Unknown error');
+    return data.result;
+  }
+
+  // ── Status polling ───────────────────────────────────────
+
+  async function pollStatus() {
+    try {
+      const data = await fetch(`${BASE}/status`).then(r => r.json());
+      const el = document.getElementById('extStatus');
+      el.textContent = data.extensionConnected ? 'Connected' : 'Disconnected';
+      el.className = 'badge ' + (data.extensionConnected ? 'green' : 'red');
+    } catch(_) {}
+  }
+
+  // ── Businesses ───────────────────────────────────────────
+
+  async function loadBusinesses() {
+    toast('Loading businesses...', 'ok');
+    try {
+      const raw = await dispatch('gbp', 'getbusinesses');
+      businesses = JSON.parse(raw);
+      const sel = document.getElementById('businessSelect');
+      sel.innerHTML = '<option value="">— Select a business —</option>';
+      businesses.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.index;
+        opt.textContent = `${b.name} — ${b.address}`;
+        sel.appendChild(opt);
+      });
+      document.getElementById('businessCard').style.display = 'block';
+      toast(`${businesses.length} businesses loaded`, 'ok');
+    } catch(e) {
+      toast('❌ ' + e.message, 'error');
+    }
+  }
+
+  async function onBusinessChange() {
+    const val = document.getElementById('businessSelect').value;
+    if (val === '') return;
+    currentBusinessIndex = parseInt(val);
+  }
+
+  // ── Reviews ──────────────────────────────────────────────
+
+  async function loadReviews() {
+    const val = document.getElementById('businessSelect').value;
+    if (val === '') { toast('Select a business first', 'error'); return; }
+    currentBusinessIndex = parseInt(val);
+
+    toast('Navigating to business reviews...', 'ok');
+    try {
+      // Navigate to the business reviews page
+      await dispatch('gbp', 'gotobusiness', { businessIndex: currentBusinessIndex });
+      await new Promise(r => setTimeout(r, 2000));
+
+      // Now scrape reviews
+      const raw = await dispatch('gbp', 'getreviews');
+      reviews = JSON.parse(raw);
+
+      renderReviews();
+      document.getElementById('reviewsCard').style.display = 'block';
+
+      const biz = businesses[currentBusinessIndex];
+      document.getElementById('reviewsTitle').textContent = `Reviews — ${biz?.name || 'Business'}`;
+      toast(`${reviews.length} reviews loaded`, 'ok');
+    } catch(e) {
+      toast('❌ ' + e.message, 'error');
+    }
+  }
+
+  function renderReviews() {
+    const tbody = document.getElementById('reviewsBody');
+    if (!reviews.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">No reviews found</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = reviews.map(r => `
+      <tr>
+        <td>${r.index}</td>
+        <td style="white-space:nowrap;">${r.name || '—'}</td>
+        <td><span class="stars">${starsHtml(r.stars)}</span></td>
+        <td class="comment-cell">${r.comment || '—'}</td>
+        <td class="${r.replied ? 'replied-yes' : 'replied-no'}">${r.replied ? 'Yes' : 'No'}</td>
+        <td class="reply-cell">${r.reply || '—'}</td>
+        <td>
+          <div class="actions-cell">
+            ${!r.replied ? `
+              <button class="btn-primary btn-sm" onclick="openModal('reply', ${r.index}, '${esc(r.name)}', '${esc(r.comment)}')">Reply</button>
+              <button class="btn-ai btn-sm" onclick="openModalAI('reply', ${r.index}, '${esc(r.name)}', '${esc(r.comment)}')">✨ AI</button>
+            ` : `
+              <button class="btn-warn btn-sm" onclick="openModal('edit', ${r.index}, '${esc(r.name)}', '${esc(r.comment)}', '${esc(r.reply)}')">Edit</button>
+              <button class="btn-danger btn-sm" onclick="deleteReply(${r.index})">Delete</button>
+            `}
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function esc(str) {
+    return (str || '').replace(/'/g, "\\'").replace(/\n/g, ' ');
+  }
+
+  // ── Modal ────────────────────────────────────────────────
+
+  function openModal(mode, reviewIndex, name, comment, existingReply = '') {
+    modalMode = mode;
+    modalReviewIndex = reviewIndex;
+    document.getElementById('modalTitle').textContent = mode === 'reply' ? 'Reply to Review' : 'Edit Reply';
+    document.getElementById('modalReviewer').textContent = `Reviewer: ${name}`;
+    document.getElementById('modalQuote').textContent = comment;
+    document.getElementById('replyText').value = existingReply;
+    document.getElementById('aiStatus').textContent = '';
+    document.getElementById('replyModal').classList.add('open');
+  }
+
+  function openModalAI(mode, reviewIndex, name, comment, existingReply = '') {
+    openModal(mode, reviewIndex, name, comment, existingReply);
+    aiSuggest();
+  }
+
+  function closeModal() {
+    document.getElementById('replyModal').classList.remove('open');
+  }
+
+  async function aiSuggest() {
+    const comment = document.getElementById('modalQuote').textContent;
+    const name = document.getElementById('modalReviewer').textContent.replace('Reviewer: ', '');
+    const statusEl = document.getElementById('aiStatus');
+    statusEl.innerHTML = '<span class="loader"></span> Generating suggestion...';
+
+    try {
+      const prompt = `Write a professional, warm, and concise Google Business Profile reply to this customer review. Keep it under 150 words. Do not include placeholders.\n\nReviewer: ${name}\nReview: ${comment}`;
+      const raw = await dispatch('claude', 'prompt', { message: prompt });
+      document.getElementById('replyText').value = raw;
+      statusEl.textContent = '✨ AI suggestion ready';
+    } catch(e) {
+      statusEl.textContent = '❌ AI failed: ' + e.message;
+    }
+  }
+
+  async function submitReply() {
+    const message = document.getElementById('replyText').value.trim();
+    if (!message) { toast('Enter a reply first', 'error'); return; }
+
+    const btn = document.getElementById('submitReplyBtn');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+
+    try {
+      const action = modalMode === 'reply' ? 'reply' : 'editreply';
+      await dispatch('gbp', action, { message, reviewIndex: modalReviewIndex });
+      toast(`✅ Reply ${modalMode === 'reply' ? 'posted' : 'updated'} successfully`, 'ok');
+      closeModal();
+      // Refresh reviews
+      setTimeout(loadReviews, 1500);
+    } catch(e) {
+      toast('❌ ' + e.message, 'error');
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Submit';
+  }
+
+  async function deleteReply(reviewIndex) {
+    if (!confirm(`Delete reply for review #${reviewIndex}? This cannot be undone.`)) return;
+    try {
+      await dispatch('gbp', 'deletereply', { reviewIndex });
+      toast('✅ Reply deleted', 'ok');
+      setTimeout(loadReviews, 1500);
+    } catch(e) {
+      toast('❌ ' + e.message, 'error');
+    }
+  }
+
+  // ── Auto reply all unreplied ─────────────────────────────
+
+  async function autoReplyAll() {
+    const unreplied = reviews.filter(r => !r.replied);
+    if (!unreplied.length) { toast('No unreplied reviews', 'ok'); return; }
+    if (!confirm(`AI will auto-reply to ${unreplied.length} unreplied review(s). Continue?`)) return;
+
+    const btn = document.getElementById('autoReplyBtn');
+    btn.disabled = true;
+
+    for (const r of unreplied) {
+      btn.textContent = `Replying to ${r.name}...`;
+      try {
+        const prompt = `Write a professional, warm, and concise Google Business Profile reply to this customer review. Keep it under 150 words. Do not include placeholders.\n\nReviewer: ${r.name}\nReview: ${r.comment}`;
+        const message = await dispatch('claude', 'prompt', { message: prompt });
+        await dispatch('gbp', 'reply', { message, reviewIndex: r.index });
+        toast(`✅ Replied to ${r.name}`, 'ok');
+        await new Promise(res => setTimeout(res, 2000));
+      } catch(e) {
+        toast(`❌ Failed for ${r.name}: ${e.message}`, 'error');
+      }
+    }
+
+    btn.textContent = '⚡ AI Reply All Unreplied';
+    btn.disabled = false;
+    setTimeout(loadReviews, 1500);
+  }
+
+  // ── Server routes needed ─────────────────────────────────
+  // POST /run with body: { provider, action, message?, reviewIndex?, businessIndex? }
+  // This page uses the existing /run endpoint — no new routes needed.
+
+  // ── Init ─────────────────────────────────────────────────
+  pollStatus();
+  setInterval(pollStatus, 3000);
+</script>
+</body>
+</html>
