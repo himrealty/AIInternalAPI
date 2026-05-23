@@ -48,10 +48,6 @@
   <h1>🤖 AI Relay Server</h1>
   <p class="subtitle">WebSocket bridge between HTTP clients and the Chrome extension</p>
 
-  <div class="nav-links">
-    <a href="/gbp" class="nav-link">📍 GBP Review Manager</a>
-  </div>
-
   <div class="grid">
 
     <div class="card">
@@ -75,22 +71,16 @@
         <option value="deepseek">DeepSeek</option>
         <option value="qwen">Qwen</option>
         <option value="gemini">Gemini</option>
-        <option value="gbp">GBP</option>
+        <option value="chatgpt">ChatGPT</option>
       </select>
       <select id="action" onchange="onActionChange()">
         <option value="prompt">prompt</option>
         <option value="getchats">getchats</option>
         <option value="gotochat">gotochat</option>
         <option value="newchat">newchat</option>
-        <option value="getbusinesses">getbusinesses</option>
-        <option value="gotobusiness">gotobusiness</option>
-        <option value="getreviews">getreviews</option>
-        <option value="reply">reply</option>
-        <option value="editreply">editreply</option>
-        <option value="deletereply">deletereply</option>
       </select>
       <input type="text" id="apiKey" placeholder="API Key (leave blank if none)">
-      <input type="text" id="message" id="message" placeholder="Enter value...">
+      <input type="text" id="message" placeholder="Enter value...">
       <div id="inputHint" style="font-size:10px;color:#64748b;margin-bottom:8px;"></div>
       <button id="sendBtn" onclick="sendPrompt()">▶ Run</button>
       <div id="response" class="response">Response will appear here...</div>
@@ -108,15 +98,11 @@
       </div>
       <div class="endpoint">
         <span class="method post">POST</span><span class="path">/run</span>
-        <div class="desc">Body: {"provider":"...","action":"...","message":"...","reviewIndex":0,"chatIndex":0} — Full control</div>
+        <div class="desc">Body: {"provider":"...","action":"...","message":"...","chatIndex":0} — Full control</div>
       </div>
       <div class="endpoint">
         <span class="method get">GET</span><span class="path">/status</span>
         <div class="desc">Server health + extension connection state</div>
-      </div>
-      <div class="endpoint">
-        <span class="method get">GET</span><span class="path">/gbp</span>
-        <div class="desc">GBP Review Manager dashboard</div>
       </div>
     </div>
 
@@ -130,10 +116,10 @@
         &nbsp;&nbsp;-d '{"message": "What is 2+2?"}'
       </div>
       <div class="endpoint" style="margin-top:8px;">
-        <div style="color:#64748b;font-size:10px;margin-bottom:6px;">GBP get reviews</div>
+        <div style="color:#64748b;font-size:10px;margin-bottom:6px;">Get chats from DeepSeek</div>
         <span class="code">curl</span> -X POST <span id="origin2"></span>/run \<br>
         &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
-        &nbsp;&nbsp;-d '{"provider":"gbp","action":"getreviews"}'
+        &nbsp;&nbsp;-d '{"provider":"deepseek","action":"getchats"}'
       </div>
     </div>
 
@@ -149,13 +135,7 @@
       prompt:       'Enter your message',
       getchats:     'No input needed',
       gotochat:     'Enter chat index (e.g. 3)',
-      newchat:      'No input needed',
-      getbusinesses:'No input needed',
-      gotobusiness: 'Enter business index (e.g. 0)',
-      getreviews:   'No input needed',
-      reply:        'Format: index:message (e.g. 2:Thanks for your review!)',
-      editreply:    'Format: index:new message (e.g. 0:Updated reply here)',
-      deletereply:  'Enter review index (e.g. 1)',
+      newchat:      'No input needed'
     };
 
     function onActionChange() {
@@ -188,7 +168,7 @@
         const tbody = document.createElement('tbody');
         parsed.forEach(row => {
           const tr = document.createElement('tr');
-          tr.innerHTML = keys.map(k => `<td>${row[k] ?? '—'}</td>`).join('');
+          tr.innerHTML = keys.map(k => `<td>${row[k] ?? '—'}</table>`).join('');
           tbody.appendChild(tr);
         });
         table.appendChild(tbody);
@@ -212,18 +192,9 @@
       btn.disabled = true;
       respEl.textContent = '⏳ Waiting for extension...';
 
-      // Build params same way as floating.js
       const body = { provider, action };
       if (action === 'prompt')       body.message       = message;
-      if (action === 'image')        body.prompt        = message;
       if (action === 'gotochat')     body.chatIndex     = parseInt(message) || 0;
-      if (action === 'gotobusiness') body.businessIndex = parseInt(message) || 0;
-      if (action === 'deletereply')  body.reviewIndex   = parseInt(message) || 0;
-      if (action === 'reply' || action === 'editreply') {
-        const [idx, ...msg] = message.split(':');
-        body.reviewIndex = parseInt(idx) || 0;
-        body.message = msg.join(':').trim();
-      }
 
       try {
         const headers = { 'Content-Type': 'application/json' };
