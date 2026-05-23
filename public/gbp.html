@@ -88,7 +88,8 @@
   <!-- Status -->
   <div class="status-bar">
     <div>Extension: <span id="extStatus" class="badge red">Disconnected</span></div>
-    <div style="margin-left:auto; display:flex; gap:8px;">
+    <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+      <input type="password" id="apiKeyInput" placeholder="API Key" style="width:140px;margin:0;padding:6px 10px;font-size:12px;" oninput="saveApiKey()">
       <button class="btn-ghost" onclick="loadBusinesses()">🏢 Load Businesses</button>
       <a href="/" style="text-decoration:none;"><button class="btn-ghost">← Back</button></a>
     </div>
@@ -150,7 +151,15 @@
 
 <script>
   const BASE = window.location.origin;
-  const API_KEY = '';  // Set your API key here if needed
+
+  function getApiKey() {
+    return localStorage.getItem('gbp_api_key') || '';
+  }
+
+  function saveApiKey() {
+    const val = document.getElementById('apiKeyInput').value.trim();
+    localStorage.setItem('gbp_api_key', val);
+  }
 
   let businesses = [];
   let reviews = [];
@@ -162,7 +171,8 @@
 
   function headers() {
     const h = { 'Content-Type': 'application/json' };
-    if (API_KEY) h['x-api-key'] = API_KEY;
+    const key = getApiKey();
+    if (key) h['x-api-key'] = key;
     return h;
   }
 
@@ -396,6 +406,10 @@
   // This page uses the existing /run endpoint — no new routes needed.
 
   // ── Init ─────────────────────────────────────────────────
+  // Restore saved API key
+  const savedKey = localStorage.getItem('gbp_api_key');
+  if (savedKey) document.getElementById('apiKeyInput').value = savedKey;
+
   pollStatus();
   setInterval(pollStatus, 3000);
 </script>
