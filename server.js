@@ -90,7 +90,7 @@ function dispatchJob(provider, actionType, params, timeoutMs = 120000) {
 }
 
 // ── PARAM BUILDER ─────────────────────────────────────────
-// Centralised — handles all providers and all actions
+// All providers except GBP
 
 function buildParams(action, body) {
   const params = {};
@@ -100,11 +100,7 @@ function buildParams(action, body) {
   if (action === 'change')       params.target        = body.target;
   if (action === 'login')        { params.email = body.email; params.password = body.password; }
   if (action === 'gotochat')     params.chatIndex     = parseInt(body.chatIndex) || 0;
-  // GBP
-  if (action === 'gotobusiness') params.businessIndex = body.businessIndex ?? 0;
-  if (action === 'reply')        { params.message = body.message; params.reviewIndex = body.reviewIndex ?? 0; }
-  if (action === 'editreply')    { params.message = body.message; params.reviewIndex = body.reviewIndex ?? 0; }
-  if (action === 'deletereply')  params.reviewIndex   = body.reviewIndex ?? 0;
+  // newchat and getchats take no parameters
   return params;
 }
 
@@ -176,10 +172,8 @@ app.get('/prompt/:provider', requireApiKey, async (req, res) => {
   }
 });
 
-// GBP dashboard — accessible at /gbp
-app.get('/gbp', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'gbp.html'));
-});
+// GBP dashboard route - REMOVED (no longer available)
+// The /gbp endpoint has been removed
 
 app.get('/jobs', requireApiKey, (req, res) => {
   res.json({ pending: pendingJobs.size, jobs: [...pendingJobs.keys()] });
@@ -206,5 +200,7 @@ function startSelfPinger() {
 
 server.listen(PORT, () => {
   console.log(`[SERVER] Running on port ${PORT}`);
+  console.log(`[SERVER] GBP provider has been removed`);
+  console.log(`[SERVER] Supported actions: prompt, newchat, getchats, gotochat, image, change, login`);
   startSelfPinger();
 });
