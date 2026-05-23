@@ -99,7 +99,7 @@ function buildParams(action, body) {
   if (action === 'image')        params.prompt        = body.message || body.prompt;
   if (action === 'change')       params.target        = body.target;
   if (action === 'login')        { params.email = body.email; params.password = body.password; }
-  if (action === 'gotochat')     params.chatIndex     = body.chatIndex ?? 0;
+  if (action === 'gotochat')     params.chatIndex     = parseInt(body.chatIndex) || 0;
   // GBP
   if (action === 'gotobusiness') params.businessIndex = body.businessIndex ?? 0;
   if (action === 'reply')        { params.message = body.message; params.reviewIndex = body.reviewIndex ?? 0; }
@@ -174,6 +174,11 @@ app.get('/prompt/:provider', requireApiKey, async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// GBP dashboard — accessible at /gbp
+app.get('/gbp', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'gbp.html'));
 });
 
 app.get('/jobs', requireApiKey, (req, res) => {
