@@ -30,18 +30,13 @@
     button:disabled { opacity: 0.5; cursor: not-allowed; }
     .full { grid-column: 1 / -1; }
     .code { color: #00e5a0; }
-
-    /* Response area — supports both text and table */
     .response { background: #0f172a; border: 1px solid #1f2937; border-radius: 6px; padding: 10px; font-family: monospace; font-size: 11px; min-height: 60px; max-height: 300px; overflow-y: auto; margin-top: 8px; color: #94a3b8; }
     .response table { width: 100%; border-collapse: collapse; }
     .response th { background: #0a0c14; color: #64748b; padding: 5px 8px; text-align: left; border-bottom: 1px solid #1f2937; text-transform: uppercase; font-size: 10px; white-space: nowrap; }
     .response td { padding: 5px 8px; border-bottom: 1px solid #1f2937; color: #e2e8f0; word-break: break-word; max-width: 200px; }
     .response tr:nth-child(even) td { background: #0a0e1a; }
-
-    /* Nav links */
-    .nav-links { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-    .nav-link { display: inline-block; padding: 6px 14px; background: #111827; border: 1px solid #1f2937; border-radius: 6px; color: #00e5a0; text-decoration: none; font-size: 12px; font-weight: 600; }
-    .nav-link:hover { background: #1f2937; }
+    /* Extra field shown only for qwenimage */
+    #imageSizeRow { display: none; }
   </style>
 </head>
 <body>
@@ -66,22 +61,32 @@
 
     <div class="card">
       <h2>Quick Test</h2>
-      <select id="provider">
-        <option value="claude">Claude</option>
-        <option value="deepseek">DeepSeek</option>
-        <option value="qwen">Qwen</option>
-        <option value="gemini">Gemini</option>
-        <option value="chatgpt">ChatGPT</option>
+
+      <!-- Provider dropdown — populated dynamically from GET /providers -->
+      <select id="provider" onchange="onProviderChange()">
+        <option value="">Loading providers...</option>
       </select>
+
+      <!-- Action dropdown — filtered per provider -->
       <select id="action" onchange="onActionChange()">
-        <option value="prompt">prompt</option>
-        <option value="getchats">getchats</option>
-        <option value="gotochat">gotochat</option>
-        <option value="newchat">newchat</option>
+        <option value="">Select provider first</option>
       </select>
+
       <input type="text" id="apiKey" placeholder="API Key (leave blank if none)">
       <input type="text" id="message" placeholder="Enter value...">
       <div id="inputHint" style="font-size:10px;color:#64748b;margin-bottom:8px;"></div>
+
+      <!-- Extra field: only shown for qwenimage -->
+      <div id="imageSizeRow">
+        <select id="imageSize">
+          <option value="16:9">16:9 Landscape</option>
+          <option value="1:1">1:1 Square</option>
+          <option value="9:16">9:16 Portrait</option>
+          <option value="4:3">4:3 Standard</option>
+          <option value="3:4">3:4 Portrait</option>
+        </select>
+      </div>
+
       <button id="sendBtn" onclick="sendPrompt()">▶ Run</button>
       <div id="response" class="response">Response will appear here...</div>
     </div>
@@ -90,7 +95,7 @@
       <h2>API Endpoints</h2>
       <div class="endpoint">
         <span class="method post">POST</span><span class="path">/prompt/:provider</span>
-        <div class="desc">Body: {"message": "..."} — Send prompt to any provider</div>
+        <div class="desc">Body: {"message": "..."} — Send prompt to any provider. Claude is routed to promptui automatically.</div>
       </div>
       <div class="endpoint">
         <span class="method get">GET</span><span class="path">/prompt/:provider?message=...</span>
@@ -98,28 +103,38 @@
       </div>
       <div class="endpoint">
         <span class="method post">POST</span><span class="path">/run</span>
-        <div class="desc">Body: {"provider":"...","action":"...","message":"...","chatIndex":0} — Full control</div>
+        <div class="desc">Body: {"provider":"...","action":"...","message":"...","chatIndex":0,"imageSize":"16:9"} — Full control</div>
       </div>
       <div class="endpoint">
         <span class="method get">GET</span><span class="path">/status</span>
         <div class="desc">Server health + extension connection state</div>
+      </div>
+      <div class="endpoint">
+        <span class="method get">GET</span><span class="path">/providers</span>
+        <div class="desc">Returns provider → supported actions map (mirrors extension config)</div>
       </div>
     </div>
 
     <div class="card full">
       <h2>curl Examples</h2>
       <div class="endpoint">
-        <div style="color:#64748b;font-size:10px;margin-bottom:6px;">POST prompt</div>
+        <div style="color:#64748b;font-size:10px;margin-bottom:6px;">POST prompt to Claude (auto-routes to promptui)</div>
         <span class="code">curl</span> -X POST <span id="origin1"></span>/prompt/claude \<br>
         &nbsp;&nbsp;-H "x-api-key: YOUR_KEY" \<br>
         &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
         &nbsp;&nbsp;-d '{"message": "What is 2+2?"}'
       </div>
       <div class="endpoint" style="margin-top:8px;">
-        <div style="color:#64748b;font-size:10px;margin-bottom:6px;">Get chats from DeepSeek</div>
+        <div style="color:#64748b;font-size:10px;margin-bottom:6px;">Full control via /run — get chats from DeepSeek</div>
         <span class="code">curl</span> -X POST <span id="origin2"></span>/run \<br>
         &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
         &nbsp;&nbsp;-d '{"provider":"deepseek","action":"getchats"}'
+      </div>
+      <div class="endpoint" style="margin-top:8px;">
+        <div style="color:#64748b;font-size:10px;margin-bottom:6px;">Qwen image generation with aspect ratio</div>
+        <span class="code">curl</span> -X POST <span id="origin3"></span>/run \<br>
+        &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
+        &nbsp;&nbsp;-d '{"provider":"qwen","action":"qwenimage","message":"a sunset over mountains","imageSize":"16:9"}'
       </div>
     </div>
 
@@ -129,20 +144,61 @@
     const BASE = window.location.origin;
     document.getElementById('origin1').textContent = BASE;
     document.getElementById('origin2').textContent = BASE;
+    document.getElementById('origin3').textContent = BASE;
 
-    // Input hints per action
+    // Hint text per action
     const hints = {
-      prompt:       'Enter your message',
-      getchats:     'No input needed',
-      gotochat:     'Enter chat index (e.g. 3)',
-      newchat:      'No input needed'
+      prompt:    'Enter your message',
+      promptui:  'Enter your message',
+      getchats:  'No input needed',
+      gotochat:  'Enter chat index (e.g. 3)',
+      newchat:   'No input needed',
+      image:     'Enter image prompt',
+      qwenimage: 'Enter image prompt — select aspect ratio below',
+      change:    'Enter change target',
+      login:     'Enter email,password'
     };
+
+    // Provider config loaded from server
+    let providerConfig = {};
+
+    async function loadProviders() {
+      try {
+        providerConfig = await fetch(`${BASE}/providers`).then(r => r.json());
+        const sel = document.getElementById('provider');
+        sel.innerHTML = '<option value="">Select Provider</option>';
+        for (const p of Object.keys(providerConfig)) {
+          const opt = document.createElement('option');
+          opt.value = p;
+          opt.textContent = p.charAt(0).toUpperCase() + p.slice(1);
+          sel.appendChild(opt);
+        }
+      } catch(_) {
+        document.getElementById('provider').innerHTML = '<option value="">Failed to load</option>';
+      }
+    }
+
+    function onProviderChange() {
+      const provider = document.getElementById('provider').value;
+      const actions  = providerConfig[provider] || [];
+      const actionSel = document.getElementById('action');
+
+      actionSel.innerHTML = '<option value="">Select Action</option>';
+      for (const a of actions) {
+        const opt = document.createElement('option');
+        opt.value = a;
+        opt.textContent = a.charAt(0).toUpperCase() + a.slice(1);
+        actionSel.appendChild(opt);
+      }
+      onActionChange();
+    }
 
     function onActionChange() {
       const action = document.getElementById('action').value;
       document.getElementById('inputHint').textContent = hints[action] || '';
+      // Show image size selector only for qwenimage
+      document.getElementById('imageSizeRow').style.display = action === 'qwenimage' ? 'block' : 'none';
     }
-    onActionChange();
 
     async function poll() {
       try {
@@ -168,7 +224,7 @@
         const tbody = document.createElement('tbody');
         parsed.forEach(row => {
           const tr = document.createElement('tr');
-          tr.innerHTML = keys.map(k => `<td>${row[k] ?? '—'}</table>`).join('');
+          tr.innerHTML = keys.map(k => `<td>${row[k] ?? '—'}</td>`).join('');
           tbody.appendChild(tr);
         });
         table.appendChild(tbody);
@@ -182,19 +238,24 @@
     }
 
     async function sendPrompt() {
-      const provider = document.getElementById('provider').value;
-      const action   = document.getElementById('action').value;
-      const message  = document.getElementById('message').value.trim();
-      const apiKey   = document.getElementById('apiKey').value.trim();
-      const respEl   = document.getElementById('response');
-      const btn      = document.getElementById('sendBtn');
+      const provider  = document.getElementById('provider').value;
+      const action    = document.getElementById('action').value;
+      const message   = document.getElementById('message').value.trim();
+      const apiKey    = document.getElementById('apiKey').value.trim();
+      const imageSize = document.getElementById('imageSize').value;
+      const respEl    = document.getElementById('response');
+      const btn       = document.getElementById('sendBtn');
+
+      if (!provider || !action) { respEl.textContent = '❌ Select provider and action first'; return; }
 
       btn.disabled = true;
       respEl.textContent = '⏳ Waiting for extension...';
 
       const body = { provider, action };
-      if (action === 'prompt')       body.message       = message;
-      if (action === 'gotochat')     body.chatIndex     = parseInt(message) || 0;
+      if (action === 'prompt' || action === 'promptui') body.message = message;
+      if (action === 'gotochat')  body.chatIndex  = parseInt(message) || 0;
+      if (action === 'image')     body.message    = message;
+      if (action === 'qwenimage') { body.message = message; body.imageSize = imageSize; }
 
       try {
         const headers = { 'Content-Type': 'application/json' };
@@ -211,6 +272,7 @@
 
     document.getElementById('message').addEventListener('keydown', e => { if (e.key === 'Enter') sendPrompt(); });
 
+    loadProviders();
     poll();
     setInterval(poll, 3000);
   </script>
