@@ -21,6 +21,24 @@ app.use((req, res, next) => {
   next();
 });
 
+// ── PROVIDER CONFIG ───────────────────────────────────────
+// Must mirror PROVIDER_CONFIG in background.js exactly.
+// Remove qwenvideo since video is not supported via relay.
+
+const PROVIDER_CONFIG = {
+  deepseek: ['prompt', 'newchat', 'getchats', 'gotochat'],
+  qwen:     ['prompt', 'newchat', 'getchats', 'gotochat', 'qwenimage'],
+  claude:   ['promptui', 'newchat', 'getchats', 'gotochat'],
+  gemini:   ['prompt', 'newchat', 'getchats', 'gotochat', 'image'],
+  chatgpt:  ['prompt', 'newchat', 'getchats', 'gotochat']
+};
+
+// Returns the correct prompt action for a given provider.
+// Claude uses 'promptui'; everyone else uses 'prompt'.
+function promptActionFor(provider) {
+  return provider === 'claude' ? 'promptui' : 'prompt';
+}
+
 // ── STATE ─────────────────────────────────────────────────
 
 let extensionSocket = null;
@@ -90,16 +108,28 @@ function dispatchJob(provider, actionType, params, timeoutMs = 120000) {
 }
 
 // ── PARAM BUILDER ─────────────────────────────────────────
-// All providers except GBP
+// FIX: added promptui, qwenimage cases.
+// qwenvideo is intentionally excluded — not supported via relay.
 
 function buildParams(action, body) {
   const params = {};
-  // AI chat providers
-  if (action === 'prompt')       params.message       = body.message || body.prompt;
+
+  // Prompt actions — both 'prompt' (all providers) and 'promptui' (Claude)
+  if (action === 'prompt' || action === 'promptui') {
+    params.message = body.message || body.prompt;
+  }
+
   if (action === 'image')        params.prompt        = body.message || body.prompt;
   if (action === 'change')       params.target        = body.target;
   if (action === 'login')        { params.email = body.email; params.password = body.password; }
   if (action === 'gotochat')     params.chatIndex     = parseInt(body.chatIndex) || 0;
+
+  // FIX: pass imageSize through for Qwen image generation
+  if (action === 'qwenimage') {
+    params.message   = body.message || body.prompt;
+    params.imageSize = body.imageSize || '16:9';
+  }
+
   // newchat and getchats take no parameters
   return params;
 }
@@ -114,11 +144,21 @@ app.get('/status', (req, res) => {
   });
 });
 
+// FIX: expose provider config so the dashboard can drive its dropdowns dynamically
+app.get('/providers', (req, res) => {
+  res.json(PROVIDER_CONFIG);
+});
+
 // POST /run — universal endpoint, handles all providers and actions
 app.post('/run', requireApiKey, async (req, res) => {
   const { provider, action } = req.body;
   if (!provider) return res.status(400).json({ error: 'provider required' });
   if (!action)   return res.status(400).json({ error: 'action required' });
+
+  // Reject video jobs cleanly
+  if (action === 'qwenvideo') {
+    return res.status(400).json({ error: 'qwenvideo is not supported via the relay. Use the extension directly.' });
+  }
 
   const params = buildParams(action, req.body);
 
@@ -136,6 +176,10 @@ app.get('/run', requireApiKey, async (req, res) => {
   if (!provider) return res.status(400).json({ error: 'provider required' });
   if (!action)   return res.status(400).json({ error: 'action required' });
 
+  if (action === 'qwenvideo') {
+    return res.status(400).json({ error: 'qwenvideo is not supported via the relay. Use the extension directly.' });
+  }
+
   const params = buildParams(action, { ...req.query, message: message || prompt });
 
   try {
@@ -147,12 +191,16 @@ app.get('/run', requireApiKey, async (req, res) => {
 });
 
 // POST /prompt/:provider — shorthand
+// FIX: routes Claude to 'promptui', all others to 'prompt'
 app.post('/prompt/:provider', requireApiKey, async (req, res) => {
   const { provider } = req.params;
   const text = req.body.message || req.body.prompt;
   if (!text) return res.status(400).json({ error: 'message required' });
+
+  const actionType = promptActionFor(provider);
+
   try {
-    const result = await dispatchJob(provider, 'prompt', { message: text });
+    const result = await dispatchJob(provider, actionType, { message: text });
     res.json({ ok: true, result });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -160,20 +208,21 @@ app.post('/prompt/:provider', requireApiKey, async (req, res) => {
 });
 
 // GET /prompt/:provider — shorthand
+// FIX: same routing fix as POST above
 app.get('/prompt/:provider', requireApiKey, async (req, res) => {
   const { provider } = req.params;
   const text = req.query.message || req.query.prompt;
   if (!text) return res.status(400).json({ error: 'message required' });
+
+  const actionType = promptActionFor(provider);
+
   try {
-    const result = await dispatchJob(provider, 'prompt', { message: text });
+    const result = await dispatchJob(provider, actionType, { message: text });
     res.json({ ok: true, result });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
-
-// GBP dashboard route - REMOVED (no longer available)
-// The /gbp endpoint has been removed
 
 app.get('/jobs', requireApiKey, (req, res) => {
   res.json({ pending: pendingJobs.size, jobs: [...pendingJobs.keys()] });
@@ -200,7 +249,7 @@ function startSelfPinger() {
 
 server.listen(PORT, () => {
   console.log(`[SERVER] Running on port ${PORT}`);
-  console.log(`[SERVER] GBP provider has been removed`);
-  console.log(`[SERVER] Supported actions: prompt, newchat, getchats, gotochat, image, change, login`);
+  console.log(`[SERVER] Supported providers: ${Object.keys(PROVIDER_CONFIG).join(', ')}`);
+  console.log(`[SERVER] Note: qwenvideo is disabled via relay`);
   startSelfPinger();
 });
